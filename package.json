@@ -1,0 +1,22 @@
+{
+  "name": "know-it-all-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "bottleneck": "^2.19.5",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "fs": "^0.0.1-security",
+    "node-cache": "^5.1.2",
+    "openai": "^4.52.3",
+    "web-streams-polyfill": "^4.0.0"
+  }
+}
