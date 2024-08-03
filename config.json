@@ -1,6 +1,5 @@
 {
     "IGNORE_PREFIX": "$",
     "AI_PREFIX": "?",
-    "BOT_PREFIX": "/",
-    "CHANNEL_IDS": ["1009215269266264178"]
+    "BOT_PREFIX": "!"
 }
