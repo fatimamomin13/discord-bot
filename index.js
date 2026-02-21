@@ -1,136 +1,91 @@
 require("dotenv/config");
 const fs = require("fs");
 const path = require("path");
-const Bottleneck = require("bottleneck");
-const NodeCache = require("node-cache");
 const { Client, Collection } = require("discord.js");
-const { OpenAI } = require("openai");
 
 const client = new Client({
-    intents: [
-        "Guilds",
-        "GuildMembers",
-        "GuildMessages",
-        "MessageContent",
-        "GuildMessageReactions",
-    ],
+	intents: [
+		"Guilds",
+		"GuildMembers",
+		"GuildMessages",
+		"MessageContent",
+		"GuildMessageReactions",
+	],
 });
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_KEY,
-});
-
-const limiter = new Bottleneck({
-    minTime: 3000, // 3 seconds between requests
-    maxConcurrent: 1,
-});
-
-const cache = new NodeCache({ stdTTL: 600 }); // Cache responses for 10 minutes
 
 client.commands = new Collection();
 
 const commandFiles = fs
-    .readdirSync(path.join(__dirname, "commands"))
-    .filter((file) => file.endsWith(".js"));
+	.readdirSync(path.join(__dirname, "commands"))
+	.filter((file) => file.endsWith(".js"));
 
 for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    client.commands.set(command.name, command);
+	const command = require(`./commands/${file}`);
+	client.commands.set(command.name, command);
 }
 
 client.on("ready", () => {
-    console.log("The bot is online");
+	console.log(`✅ ${client.user.tag} is online`);
+	console.log(`📌 Bot prefix: $`);
+	console.log(`🤖 AI prefix: ?`);
+	console.log(`🔇 Ignore prefix: !`);
 });
 
-IGNORE_PREFIX = "$";
-AI_PREFIX = "?";
-BOT_PREFIX = "/";
+const IGNORE_PREFIX = "!";
+const AI_PREFIX = "?";
+const BOT_PREFIX = "$";
 
 client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (message.content.startsWith(IGNORE_PREFIX)) return;
+	if (message.author.bot) return;
+	if (message.content.startsWith(IGNORE_PREFIX)) return;
 
-    const content = message.content.trim(); //This line removes any leading and trailing whitespace from the message content.
-    const prefix = content.charAt(0); //This line extracts the first character of the trimmed message content, which is expected to be the prefix.
-    const args = content.slice(1).split(/ +/);
-    const commandName = args.shift().toLowerCase(); //This line extracts the rest of the message content after the prefix and converts it to lowercase.
+	const content = message.content.trim();
+	const prefix = content.charAt(0);
 
-    if (prefix == BOT_PREFIX) {
-        const command = client.commands.get(commandName);
-        if (command) {
-            try {
-                command.execute(message, args);
-            } catch (error) {
-                console.log(error);
-                message.channel.send(
-                    "There was an error executing the command."
-                );
-            }
-        } else {
-            message.channel.send("Sorry, no such command exist.");
-        }
-        return;
-    }
+	// Handle bot commands ($command)
+	if (prefix === BOT_PREFIX) {
+		const args = content.slice(1).split(/ +/);
+		const commandName = args.shift().toLowerCase();
 
-    async function requestWithExponentialBackoff(
-        requestFunc,
-        retries = 5,
-        delay = 1000
-    ) {
-        let attempt = 0;
-        while (attempt < retries) {
-            try {
-                return await requestFunc();
-            } catch (error) {
-                attempt++;
-                if (attempt >= retries) throw error;
-                const backoffDelay = delay * Math.pow(2, attempt);
-                console.log(`Retrying in ${backoffDelay} ms...`);
-                await new Promise((resolve) =>
-                    setTimeout(resolve, backoffDelay)
-                );
-            }
-        }
-    }
+		// Try exact match first, then try matching just the base name (e.g. "sad" from "sad-100")
+		let command = client.commands.get(commandName);
+		if (!command) {
+			const baseName = commandName.split("-")[0];
+			command = client.commands.get(baseName);
+		}
+		if (command) {
+			try {
+				await command.execute(message, args);
+			} catch (error) {
+				console.error(
+					`Error executing command "${commandName}":`,
+					error,
+				);
+				message.channel.send(
+					"❌ There was an error executing the command.",
+				);
+			}
+		} else {
+			message.channel.send(
+				`❌ Unknown command: \`$${commandName}\`. Use \`$help\` to see available commands.`,
+			);
+		}
+		return;
+	}
 
-    if (prefix == AI_PREFIX) {
-        const cachedResponse = cache.get(message.content);
-        if (cachedResponse) {
-            message.channel.send(cachedResponse);
-            return;
-        }
-
-        limiter.schedule(async () => {
-            try {
-                const response = await requestWithExponentialBackoff(
-                    async () => {
-                        return await openai.chat.completions.create({
-                            model: "gpt-3.5-turbo",
-                            messages: [
-                                {
-                                    role: "system",
-                                    content:
-                                        "Hi I am know it all, I literally know it all",
-                                },
-                                {
-                                    role: "user",
-                                    content: message.content,
-                                },
-                            ],
-                        });
-                    }
-                );
-                const replyContent = response.choices[0].message.content;
-                cache.set(message.content, replyContent);
-                message.channel.send(replyContent);
-            } catch (error) {
-                console.error("OpenAI Error :\n", error);
-                message.channel.send(
-                    "I'm currently experiencing high traffic. Please try again later."
-                );
-            }
-        });
-    }
+	// Handle AI queries (?query)
+	if (prefix === AI_PREFIX) {
+		const aiCommand = client.commands.get("ai");
+		if (aiCommand) {
+			try {
+				await aiCommand.execute(message, content.slice(1).trim());
+			} catch (error) {
+				console.error("Error executing AI command:", error);
+				message.channel.send("❌ AI command failed. Please try again.");
+			}
+		}
+		return;
+	}
 });
 
 client.login(process.env.TOKEN);
