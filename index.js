@@ -23,6 +23,8 @@ for (const file of commandFiles) {
 	const command = require(`./commands/${file}`);
 	client.commands.set(command.name, command);
 }
+console.log("Loaded commands:", [...client.commands.keys()]);
+
 
 client.on("ready", () => {
 	console.log(`✅ ${client.user.tag} is online`);
